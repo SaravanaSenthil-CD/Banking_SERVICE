@@ -12,16 +12,19 @@ import * as bcrypt from 'bcrypt';
 import { WithdrawAmountDto } from './dto/withdraw-amount.dto';
 import { Workbook } from 'exceljs';
 import { Response } from 'express';
-import { timeStamp } from 'console';
+import { MailService } from '../mail/mail.service';
 
 @Injectable()
 export class TransactionService {
   constructor(
     @InjectRepository(Transaction)
-    private readonly transactionRepositry: Repository<Transaction>,
+    private readonly transactionRepository: Repository<Transaction>,
 
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+
+    private readonly mailservice:MailService,
+
   ) {}
 
   async creditAmount(creditAmountDto: CreditAmountDto): Promise<Transaction> {
@@ -30,7 +33,7 @@ export class TransactionService {
     });
 
     if (!user) {
-      throw new NotFoundException('user not found');
+      throw new NotFoundException('User not found');
     }
 
     const isPinValid = await bcrypt.compare(creditAmountDto.pin, user.pin);
@@ -39,31 +42,38 @@ export class TransactionService {
       throw new BadRequestException('Invalid PIN');
     }
 
+    user.balance = parseFloat(user.balance as any) + creditAmountDto.amount;
+
     const transaction = new Transaction();
     transaction.user = user;
     transaction.type = 'Credit';
     transaction.amount = creditAmountDto.amount;
-    transaction.balanceAfterTransaction = user.balance + creditAmountDto.amount;
+    transaction.balanceAfterTransaction = user.balance;
     transaction.description = `Credit of amount ${creditAmountDto.amount}`;
     transaction.timestamp = new Date();
 
-    user.balance += creditAmountDto.amount;
+    
     await this.userRepository.save(user);
 
-    return await this.transactionRepositry.save(transaction);
+    const savedTransaction= await this.transactionRepository.save(transaction);
+    await this.mailservice.sendTransactionConfirmation(
+      user.email,
+      'Credit',
+      creditAmountDto.amount,
+      user.balance,
+    );
+    return savedTransaction
   }
 
   async withDrawAmount(
     withdrawAmountDto: WithdrawAmountDto,
   ): Promise<Transaction> {
-    // const { accountNumber, name, pin, amount } = withdrawAmountDto;
-
     const user = await this.userRepository.findOne({
       where: { accountNumber: withdrawAmountDto.accountNumber },
     });
 
     if (!user) {
-      throw new NotFoundException('user not found');
+      throw new NotFoundException('User not found');
     }
     const isPinValid = await bcrypt.compare(withdrawAmountDto.pin, user.pin);
 
@@ -78,10 +88,10 @@ export class TransactionService {
     const minimumBalance = user.accountType == 'Savings' ? 500 : 0;
 
     if (user.balance - withdrawAmountDto.amount < minimumBalance) {
-      throw new BadRequestException('cannot withdraw beyond minimum balance');
+      throw new BadRequestException('Cannot withdraw beyond minimum balance');
     }
 
-    user.balance -= withdrawAmountDto.amount;
+    user.balance = parseFloat(user.balance as any) - withdrawAmountDto.amount;
 
     const transaction = new Transaction();
     transaction.user = user;
@@ -92,7 +102,16 @@ export class TransactionService {
     transaction.timestamp = new Date();
 
     await this.userRepository.save(user);
-    return this.transactionRepositry.save(transaction);
+        const savedTransaction = await this.transactionRepository.save(transaction);
+    
+        await this.mailservice.sendTransactionConfirmation(
+          user.email,
+          'Withdraw',
+          withdrawAmountDto.amount,
+          user.balance,
+        );
+    
+        return savedTransaction;
   }
 
   async getCurrentBalance(
@@ -114,12 +133,12 @@ export class TransactionService {
   }
 
   async getTransactionLogs(userId: string, response: Response): Promise<void> {
-    const transactions = await this.transactionRepositry.find({
+    const transactions = await this.transactionRepository.find({
       where: { id: userId },
     });
 
     if (!transactions.length) {
-      throw new NotFoundException('No transaction Logs found');
+      throw new NotFoundException('No transaction logs found');
     }
 
     const workbook = new Workbook();
@@ -130,8 +149,8 @@ export class TransactionService {
       { header: 'Type', key: 'type', width: 10 },
       { header: 'Amount', key: 'amount', width: 15 },
       {
-        header: 'Balance After Transtion',
-        key: 'balanceaftertranscation',
+        header: 'Balance After Transaction',
+        key: 'balanceAfterTransaction',
         width: 30,
       },
       { header: 'Timestamp', key: 'timestamp', width: 30 },
@@ -139,12 +158,12 @@ export class TransactionService {
     ];
 
     transactions.forEach((transaction) => {
-      const row = workSheet.addRow({
+      workSheet.addRow({
         id: transaction.id,
         type: transaction.type,
         amount: transaction.amount,
-        balanceaftertrancation: transaction.balanceAfterTransaction,
-        timeStamp: transaction.timestamp,
+        balanceAfterTransaction: transaction.balanceAfterTransaction,
+        timestamp: transaction.timestamp,
         description: transaction.description,
       });
     });
@@ -160,5 +179,9 @@ export class TransactionService {
 
     await workbook.xlsx.write(response);
     response.end();
+    await this.mailservice.sendTransactionLogs(
+      transactions[0].user.email,
+      transactions.length,
+    );
   }
 }

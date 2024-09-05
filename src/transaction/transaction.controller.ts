@@ -1,60 +1,101 @@
 import {
-  Body,
   Controller,
   Get,
+  Post,
+  Param,
+  Body,
+  UseGuards,
+  Req,
   HttpException,
   HttpStatus,
-  Param,
-  Post,
-  Res,
+  Logger,
 } from '@nestjs/common';
 import { TransactionService } from './transaction.service';
 import { CreditAmountDto } from './dto/credit-amount.dto';
-import { Transaction } from '../transaction/entities/transaction.entity';
 import { WithdrawAmountDto } from './dto/withdraw-amount.dto';
-import { Response } from 'express';
+import { Transaction } from './entities/transaction.entity';
+import { Request } from 'express';
+import { JwtAuthGuard } from '../auth/auth.gaurd';
 
 @Controller('transaction')
 export class TransactionController {
+  private readonly logger = new Logger(TransactionController.name); // Logger instance
+
   constructor(private readonly transactionService: TransactionService) {}
 
+  @UseGuards(JwtAuthGuard)
   @Post('credit')
   async creditAmount(
     @Body() creditAmountDto: CreditAmountDto,
+    @Req() req: Request,
   ): Promise<Transaction> {
     try {
-      return await this.transactionService.creditAmount(creditAmountDto);
+      const result = await this.transactionService.creditAmount(creditAmountDto);
+      this.logger.log(`Amount credited successfully for user: ${creditAmountDto.name}`);
+      return result;
     } catch (error) {
+      this.logger.error(
+        `Failed to credit amount for user: ${creditAmountDto.name}. Error: ${error.message}`,
+        error.stack,
+      ); // Log error with stack trace
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
     }
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post('withdraw')
-  async WithdrawAmount(
+  async withdrawAmount(
     @Body() withdrawAmountDto: WithdrawAmountDto,
+    @Req() req: Request,
   ): Promise<Transaction> {
     try {
-      return await this.transactionService.withDrawAmount(withdrawAmountDto);
+      const result = await this.transactionService.withDrawAmount(withdrawAmountDto);
+      this.logger.log(`Amount withdrawn successfully for user: ${withdrawAmountDto.name}`);
+      return result;
     } catch (error) {
+      this.logger.error(
+        `Failed to withdraw amount for user: ${withdrawAmountDto.name}. Error: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
     }
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('balance/:accountNumber')
   async checkCurrentBalance(
     @Param('accountNumber') accountNumber: string,
-  ): Promise<{ balance: number; accountNumber: string; name: string }> {
+    @Req() req: Request,
+  ) {
     try {
-      return this.transactionService.getCurrentBalance(accountNumber);
+      const balance = await this.transactionService.getCurrentBalance(accountNumber);
+      this.logger.log(`Balance retrieved successfully for account: ${accountNumber}`);
+      return balance;
     } catch (error) {
+      this.logger.error(
+        `Failed to retrieve balance for account: ${accountNumber}. Error: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(error.message, HttpStatus.BAD_GATEWAY);
     }
   }
+
+  @UseGuards(JwtAuthGuard)
   @Get('logs/:userId')
   async getTransactionLogs(
     @Param('userId') userId: string,
-    @Res() response: Response,
-  ): Promise<void> {
-    return this.transactionService.getTransactionLogs(userId, response);
+    @Req() req: Request,
+  ) {
+    try {
+      const logs = await this.transactionService.getTransactionLogs(userId, req.res);
+      this.logger.log(`Transaction logs retrieved successfully for user: ${userId}`);
+      return logs;
+    } catch (error) {
+      this.logger.error(
+        `Failed to retrieve transaction logs for user: ${userId}. Error: ${error.message}`,
+        error.stack,
+      );
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
   }
 }
