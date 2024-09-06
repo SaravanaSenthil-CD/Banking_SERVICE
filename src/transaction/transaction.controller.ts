@@ -80,7 +80,7 @@ export class TransactionController {
     }
   }
 
-  // @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Get('logs/:userId')
   async getTransactionLogs(
     @Param('userId') userId: string,
