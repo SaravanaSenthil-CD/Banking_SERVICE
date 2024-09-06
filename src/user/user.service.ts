@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from './entities/user.entity';
 import { Repository } from 'typeorm';
@@ -13,6 +13,8 @@ interface CreateAccountResponse {
 
 @Injectable()
 export class UserService {
+  private readonly logger = new Logger(UserService.name);
+
   constructor(
     @InjectRepository(User)
     private readonly UserRepositry: Repository<User>,
@@ -21,14 +23,15 @@ export class UserService {
   async createAccount(
     CreateUserDto: CreateUserDto,
   ): Promise<CreateAccountResponse> {
-    try {
-      const { name, email, aadhaarNumber, accountType, branch } = CreateUserDto;
+    const { name, email, aadhaarNumber, accountType, branch } = CreateUserDto;
 
+    try {
       const existingUser = await this.UserRepositry.findOne({
         where: [{ email }, { aadhaarNumber }],
       });
 
       if (existingUser) {
+        this.logger.warn(`User with email: ${email} or Aadhaar number: ${aadhaarNumber} already exists.`); 
         throw new BadRequestException(
           'User with this email or Aadhaar number already exists.',
         );
@@ -39,9 +42,7 @@ export class UserService {
       const pin = this.genaratePin();
 
       const hashedPin = await this.hashPin(pin);
-
-      const initialBalance =
-        accountType == AccountType.Savings ? Math.floor(500) : 0;
+      const initialBalance = accountType === AccountType.Savings ? Math.floor(500) : 0;
 
       const user = this.UserRepositry.create({
         id: uuidv4(),
@@ -56,9 +57,15 @@ export class UserService {
       });
 
       const savedUser = await this.UserRepositry.save(user);
+      this.logger.log(`User created successfully with email: ${email} and account number: ${accountNumber}`); 
+
       return { user: savedUser, pin };
     } catch (error) {
-      throw new Error('');
+      this.logger.error(`Failed to create account for email: ${email}. Error: ${error.message}`, error.stack);
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new Error('Account creation failed');
     }
   }
 
