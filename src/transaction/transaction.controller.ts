@@ -19,7 +19,7 @@ import { JwtAuthGuard } from '../auth/auth.gaurd';
 
 @Controller('transaction')
 export class TransactionController {
-  private readonly logger = new Logger(TransactionController.name); // Logger instance
+  private readonly logger = new Logger(TransactionController.name);
 
   constructor(private readonly transactionService: TransactionService) {}
 
@@ -37,7 +37,7 @@ export class TransactionController {
       this.logger.error(
         `Failed to credit amount for user: ${creditAmountDto.name}. Error: ${error.message}`,
         error.stack,
-      ); // Log error with stack trace
+      );
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
     }
   }
@@ -80,7 +80,7 @@ export class TransactionController {
     }
   }
 
-  @UseGuards(JwtAuthGuard)
+  // @UseGuards(JwtAuthGuard)
   @Get('logs/:userId')
   async getTransactionLogs(
     @Param('userId') userId: string,

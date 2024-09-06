@@ -6,7 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Transaction } from '../transaction/entities/transaction.entity';
 import { Repository } from 'typeorm';
-import { User } from 'src/user/entities/user.entity';
+import { User } from '../user/entities/user.entity';
 import { CreditAmountDto } from './dto/credit-amount.dto';
 import * as bcrypt from 'bcrypt';
 import { WithdrawAmountDto } from './dto/withdraw-amount.dto';
@@ -134,54 +134,49 @@ export class TransactionService {
 
   async getTransactionLogs(userId: string, response: Response): Promise<void> {
     const transactions = await this.transactionRepository.find({
-      where: { id: userId },
+        where: { id: userId },
     });
 
     if (!transactions.length) {
-      throw new NotFoundException('No transaction logs found');
+        throw new NotFoundException('No transaction logs found');
     }
 
     const workbook = new Workbook();
     const workSheet = workbook.addWorksheet('Transaction');
 
     workSheet.columns = [
-      { header: 'ID', key: 'id', width: 36 },
-      { header: 'Type', key: 'type', width: 10 },
-      { header: 'Amount', key: 'amount', width: 15 },
-      {
-        header: 'Balance After Transaction',
-        key: 'balanceAfterTransaction',
-        width: 30,
-      },
-      { header: 'Timestamp', key: 'timestamp', width: 30 },
-      { header: 'Description', key: 'description', width: 30 },
+        { header: 'ID', key: 'id', width: 36 },
+        { header: 'Type', key: 'type', width: 10 },
+        { header: 'Amount', key: 'amount', width: 15 },
+        {
+            header: 'Balance After Transaction',
+            key: 'balanceAfterTransaction',
+            width: 30,
+        },
+        { header: 'Timestamp', key: 'timestamp', width: 30 },
+        { header: 'Description', key: 'description', width: 30 },
     ];
 
     transactions.forEach((transaction) => {
-      workSheet.addRow({
-        id: transaction.id,
-        type: transaction.type,
-        amount: transaction.amount,
-        balanceAfterTransaction: transaction.balanceAfterTransaction,
-        timestamp: transaction.timestamp,
-        description: transaction.description,
-      });
+        workSheet.addRow({
+            id: transaction.id,
+            type: transaction.type,
+            amount: transaction.amount,
+            balanceAfterTransaction: transaction.balanceAfterTransaction,
+            timestamp: transaction.timestamp,
+            description: transaction.description,
+        });
     });
 
-    response.setHeader(
-      'Content-Type',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    );
-    response.setHeader(
-      'Content-Disposition',
-      'attachment; filename="transaction_logs.xlsx"',
-    );
+    response.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    response.setHeader('Content-Disposition', 'attachment; filename="transaction_logs.xlsx"');
 
     await workbook.xlsx.write(response);
     response.end();
-    await this.mailservice.sendTransactionLogs(
-      transactions[0].user.email,
-      transactions.length,
-    );
-  }
+
+  
+    if (transactions[0]?.user?.email) {
+        await this.mailservice.sendTransactionLogs(transactions[0].user.email, transactions.length);
+    }
+}
 }

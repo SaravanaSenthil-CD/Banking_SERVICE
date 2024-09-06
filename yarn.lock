@@ -755,7 +755,7 @@
     preview-email "^3.0.19"
     pug "^3.0.2"
 
-"@nestjs/cli@^10.0.0":
+"@nestjs/cli@^10.4.5":
   version "10.4.5"
   resolved "https://registry.npmjs.org/@nestjs/cli/-/cli-10.4.5.tgz"
   integrity sha512-FP7Rh13u8aJbHe+zZ7hM0CC4785g9Pw4lz4r2TTgRtf0zTxSWMkJaPEwyjX8SK9oWK2GsYxl+fKpwVZNbmnj9A==

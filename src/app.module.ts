@@ -1,19 +1,23 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TransactionModule } from './transaction/transaction.module';
 import { UserModule } from './user/user.module';
-// import { AuthModule } from './auth/auth.module';
+import { AuthModule } from './auth/auth.module';
 import { MailModule } from './mail/mail.module';
-import { TypeOrmModule } from '@nestjs/typeorm';
 import { typeOrmConfig } from './dbconfig/typeOrm.config';
-import { ConfigModule } from '@nestjs/config';
 
 @Module({
   imports: [
     ConfigModule.forRoot(),
-    TypeOrmModule.forRoot(typeOrmConfig),
+    TypeOrmModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => typeOrmConfig(configService),
+    }),
     TransactionModule,
     UserModule,
-    // AuthModule,
+    AuthModule,
     MailModule,
   ],
 })

@@ -10,30 +10,29 @@ import { BadRequestException } from '@nestjs/common';
 jest.mock('bcrypt');
 jest.mock('uuid', () => ({ v4: jest.fn(() => 'test-uuid') }));
 
-describe('UserService', () => {
-  let service: UserService;
-  let userRepository: Repository<User>;
-
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        UserService,
-        {
-          provide: getRepositoryToken(User),
-          useValue: {
-            findOne: jest.fn(),
-            create: jest.fn(),
-            save: jest.fn(),
+describe('createAccount', () => {
+    let service: UserService;
+    let userRepository: Repository<User>;
+  
+    beforeEach(async () => {
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          UserService,
+          {
+            provide: getRepositoryToken(User),
+            useValue: {
+              findOne: jest.fn(),
+              create: jest.fn(),
+              save: jest.fn(),
+            },
           },
-        },
-      ],
-    }).compile();
+        ],
+      }).compile();
+  
+      service = module.get<UserService>(UserService);
+      userRepository = module.get<Repository<User>>(getRepositoryToken(User));
+    });
 
-    service = module.get<UserService>(UserService);
-    userRepository = module.get<Repository<User>>(getRepositoryToken(User));
-  });
-
-  describe('createAccount', () => {
     const createUserDto: CreateUserDto = {
       name: 'John Doe',
       email: 'john.doe@example.com',
@@ -100,4 +99,3 @@ describe('UserService', () => {
       await expect(service.createAccount(createUserDto)).rejects.toThrow('Account creation failed');
     });
   });
-});
